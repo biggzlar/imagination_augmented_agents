@@ -119,9 +119,9 @@ if __name__ == '__main__':
 
     # Don't train the environmental model
     env_model.eval()
-    env_model.cuda()
+    # env_model.cuda()
     model = I3A(env_model=env_model, actions=envs.action_space.n)
-    model.cuda()
+    # model.cuda()
 
     # set up optimizer for training
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
@@ -162,8 +162,8 @@ if __name__ == '__main__':
     episode_rewards = torch.zeros([args.num_train, 1])
     final_rewards = torch.zeros([args.num_train, 1])
 
-    current_obs = current_obs.cuda()
-    rollouts.cuda()
+    # current_obs = current_obs.cuda()
+    # rollouts.cuda()
 
     for j in range(num_updates):
         model.train()
@@ -190,7 +190,7 @@ if __name__ == '__main__':
             final_rewards += (1 - masks) * episode_rewards
             episode_rewards *= masks
 
-            masks = masks.cuda()
+            # masks = masks.cuda()
 
             if current_obs.dim() == 4:
                 current_obs *= masks.unsqueeze(2).unsqueeze(2)
@@ -258,10 +258,10 @@ if __name__ == '__main__':
             state = eval_env.reset()
             model.eval()
             score = 0
-            hx, cx = Variable(torch.zeros(1, 1, model.state_size)).cuda(), Variable(torch.zeros(1, 1, model.state_size)).cuda()
-            mask = Variable(torch.zeros(1, 1, 1)).cuda()
+            hx, cx = Variable(torch.zeros(1, 1, model.state_size)), Variable(torch.zeros(1, 1, model.state_size))
+            mask = Variable(torch.zeros(1, 1, 1))
             while True:
-                state = Variable(torch.from_numpy(state).unsqueeze(0).float()).cuda()
+                state = Variable(torch.from_numpy(state).unsqueeze(0).float())
 
                 # Action logits
                 action_logit = model.forward((state, (hx, cx), mask))[1]

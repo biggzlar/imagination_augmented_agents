@@ -255,7 +255,7 @@ class I3A(nn.Module):
                 fills = ACTION_TO_ENCODING[int(action_encoding[j][0])]
                 for ind in fills:
                     action_conv[j,ind].fill_(2 if action_encoding[j][0] <= 9 else 1)
-            action_conv = Variable(action_conv.cuda())
+            action_conv = Variable(action_conv)
 
             conv_input = torch.cat([input, action_conv], 1)
 

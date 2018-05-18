@@ -141,7 +141,7 @@ if __name__ == '__main__':
     # categories = np.genfromtxt(args.categories, dtype='str')[:, 0]
 
     # set up model and convert into cuda
-    model = NAME_TO_MODEL[args.name].cuda()
+    model = NAME_TO_MODEL[args.name] # .cuda()
     print('==> model loaded')
     best_loss = 10000.0
 
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     # Adversarial network
     if use_adv_model:
-        model_adv = AdvModel().cuda()
+        model_adv = AdvModel() # .cuda()
 
         optimizer_adv = torch.optim.SGD(model_adv.parameters(), args.lr,
                                         momentum = args.momentum,
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     else:
         epoch = 0
 
-    label = torch.FloatTensor(args.batch).cuda()
+    label = torch.FloatTensor(args.batch) # .cuda()
     label_loss = nn.BCELoss()
 
     for epoch in range(epoch, args.epochs):
@@ -211,8 +211,8 @@ if __name__ == '__main__':
             count += 1
 
             # convert images and labels into cuda tensor
-            images = Variable(images.cuda()).float()
-            labels = Variable(labels.cuda()).squeeze()
+            images = Variable(images).float() # .cuda()
+            labels = Variable(labels).squeeze() # .cuda()
             outputs = model.forward(images)
 
             # Randomly Sample A Real and Fake Datapoint
@@ -304,7 +304,7 @@ if __name__ == '__main__':
             img = data['train'][234][0].unsqueeze_(0)
             for time_step in range(234, 244):
                 # print(img.size())
-                images = Variable(img.cuda()).float()
+                images = Variable(img).float() # .cuda()
                 outputs = model.forward(images).data[0][0].cpu()
 
                 next_frame = data['train'][time_step + 1][0]
