@@ -3,3 +3,7 @@
 *.pyc
 *.npz
 *.ipynb
+
+# ignore experiment results
+exp/
+__pycache__/
