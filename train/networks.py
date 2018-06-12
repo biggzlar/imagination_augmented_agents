@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from hparams import hp
+import numpy as np
 
 
 ACTION_TO_ENCODING = [
@@ -186,7 +187,7 @@ class I3A(nn.Module):
 
         self.train()
 
-    def forward(self, inputs):
+    def forward(self, inputs, training=True):
         (input, (hx, cx), mask) = inputs
         traj_encodings = []
 
@@ -225,9 +226,10 @@ class I3A(nn.Module):
                 _, (hx, cx) = self.lstm(combined_enc[i:i+1], (hx * mask[i], cx * mask[i]))
                 outputs.append(hx)
             x = torch.cat(outputs, 0)
-            x = x.view(-1, hp.lstm_output_dim)
-
-        return self.critic_linear(x), self.actor_linear(x), m_free_log, (hx, cx)
+            x = x.view(-1, hp.lstm_output_dim)      
+                            
+        logits = self.actor_linear(x)
+        return self.critic_linear(x), logits, m_free_log, (hx, cx)
 
 
     def sample_env(self, input, n):
@@ -238,14 +240,16 @@ class I3A(nn.Module):
         # First generate our list of observations
         for i in range(n):
             input = torch.cat(frames[i:i+3], dim=1)
-            actions, _ = self.model_free(input)
-
-            # For stability, detach the gradient calculated for actions
-            actions = F.softmax(actions)
-            actions = actions.multinomial().float()
-            actions = actions.detach()
-            # print(actions.data)
-            action_encoding = actions.data.cpu().numpy()
+            if i==0:
+                action_encoding = torch.Tensor([[initial_action]])
+                action_encoding = action_encoding.cpu().numpy()
+            else:
+                actions, _ = self.model_free(input)
+                # For stability, detach the gradient calculated for a      ctions
+                actions = F.softmax(actions)
+                actions = actions.multinomial().float()
+                actions = actions.detach()
+                action_encoding = actions.data.cpu().numpy()
             # print(action_encoding)
 
             action_conv = torch.zeros(batch_size, 4, 50, 50).float()
