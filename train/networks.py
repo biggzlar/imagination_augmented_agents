@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from hparams import hp
 import numpy as np
+import time
 
 
 ACTION_TO_ENCODING = [
@@ -134,8 +135,8 @@ class ModelFree(nn.Module):
             self.actor_linear.weight.data, 0.01)
         self.actor_linear.bias.data.fill_(0)
 
-    def forward(self, input):
-        x = F.elu(self.conv1(input))
+    def forward(self, inputs):
+        x = F.elu(self.conv1(inputs))
         x = F.elu(self.conv2(x))
         x = F.elu(self.conv3(x))
         x = F.elu(self.conv4(x))
@@ -188,18 +189,18 @@ class I3A(nn.Module):
         self.train()
 
     def forward(self, inputs, training=True):
-        (input, (hx, cx), mask) = inputs
+        (input_, (hx, cx), mask) = inputs
         traj_encodings = []
-
+        
         for i in range(hp.traj_num):
-            traj_encodings += [self.sample_env(input, hp.traj_length)]
+            traj_encodings += [self.sample_env(input_, hp.traj_length)]
 
         traj_encoding = torch.cat(traj_encodings, dim=1)
-        m_free_log, model_free_encoding = self.model_free(input)
+        m_free_log, model_free_encoding = self.model_free(input_)
 
         combined_enc = torch.cat([traj_encoding, model_free_encoding], dim=1)
 
-        if input.size(0) == hx.size(0):
+        if input_.size(0) == hx.size(0):
             hx = hx * mask
             cx = cx * mask
         else:
@@ -223,45 +224,44 @@ class I3A(nn.Module):
 
             outputs = []
             for i in range(combined_enc.size(0)):
+                # print(combined_enc[i:i+1].shape, (hx * mask[i], cx * mask[i]))
                 _, (hx, cx) = self.lstm(combined_enc[i:i+1], (hx * mask[i], cx * mask[i]))
                 outputs.append(hx)
             x = torch.cat(outputs, 0)
-            x = x.view(-1, hp.lstm_output_dim)      
+            x = x.view(-1, hp.lstm_output_dim)    
                             
-        logits = self.actor_linear(x)
-        return self.critic_linear(x), logits, m_free_log, (hx, cx)
+        return self.critic_linear(x), self.actor_linear(x), m_free_log, (hx, cx)
 
 
-    def sample_env(self, input, n):
+    def sample_env(self, inputs, n, initial_action=-1):
         """Input should be nx3x50x50 tensor of the past 3 states observed"""
-        frames = list(torch.split(input, 1, 1))
-        batch_size = input.size(0)
+        frames = list(torch.split(inputs, 1, 1))
+        batch_size = inputs.size(0)
 
         # First generate our list of observations
         for i in range(n):
-            input = torch.cat(frames[i:i+3], dim=1)
-            if i==0:
+            inputs = torch.cat(frames[i:i+3], dim=1)
+            if i==0 and initial_action!=-1:
                 action_encoding = torch.Tensor([[initial_action]])
                 action_encoding = action_encoding.cpu().numpy()
             else:
-                actions, _ = self.model_free(input)
-                # For stability, detach the gradient calculated for a      ctions
+                actions, _ = self.model_free(inputs)
+                # For stability, detach the gradient calculated for actions
                 actions = F.softmax(actions)
+                # print(actions.shape)
                 actions = actions.multinomial().float()
                 actions = actions.detach()
                 action_encoding = actions.data.cpu().numpy()
-            # print(action_encoding)
 
             action_conv = torch.zeros(batch_size, 4, 50, 50).float()
-            # print(action_encoding)
-            # print(action_encoding.shape)
+
             for j in range(action_encoding.shape[0]):
                 fills = ACTION_TO_ENCODING[int(action_encoding[j][0])]
                 for ind in fills:
                     action_conv[j,ind].fill_(2 if action_encoding[j][0] <= 9 else 1)
             action_conv = Variable(action_conv)
 
-            conv_input = torch.cat([input, action_conv], 1)
+            conv_input = torch.cat([inputs, action_conv], 1)
 
             o_frame = self.env_model(conv_input)
             frames.append(o_frame)
@@ -282,7 +282,7 @@ class I3A(nn.Module):
 
         frame_seq = x.view(batch_size, hp.traj_length, -1)
         frame_seq = frame_seq.transpose(0, 1)
-        output, (hx, cx) = self.encoder_lstm(frame_seq)
+        _, (_, cx) = self.encoder_lstm(frame_seq)
 
         cx = cx.transpose(0, 1).contiguous()
         batch_size = cx.size(0)
