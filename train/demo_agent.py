@@ -56,19 +56,16 @@ if __name__ == '__main__':
         hx, cx = Variable(torch.zeros(1, 1, model.state_size)), Variable(torch.zeros(1, 1, model.state_size))
         mask = Variable(torch.zeros(1, 1, 1))
         while True:
-            if args.render == True:
-                env_.render()
-
             state = Variable(torch.from_numpy(state).unsqueeze(0).float())
+            env_.render()
 
             # Action logits
             action_logit = model.forward((state, (hx, cx), mask))[1]
             action_probs = F.softmax(action_logit)
-            log_probs = F.log_softmax(action_logit)
             actions = action_probs.multinomial()
             action = actions[0, 0]
-
             state, reward, done, _ = env_.step(action.data[0])
+                
             score += reward
             if done:
                 break
